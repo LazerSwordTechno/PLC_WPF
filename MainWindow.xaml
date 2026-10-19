@@ -1,0 +1,801 @@
+﻿<!--
+    PLC I/O 监控面板（纯 XAML，无后端 / 无 ViewModel / 无数据绑定层）
+    代码后置只需标准构造函数：InitializeComponent();
+    x:Class 请按你自己的项目命名空间调整。
+-->
+<Window
+    x:Class="PlcIoPanel.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="PLC I/O 监控面板"
+    Width="1030"
+    Height="760"
+    MinWidth="860"
+    MinHeight="640"
+    Background="#FF1B1B24"
+    FontFamily="Microsoft YaHei UI"
+    FontSize="13"
+    Foreground="#FFE8E8F0"
+    TextOptions.TextFormattingMode="Display"
+    WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+
+        <!--  ========== 颜色 ==========  -->
+        <SolidColorBrush x:Key="Brush.Panel" Color="#FF23232E" />
+        <SolidColorBrush x:Key="Brush.PanelDeep" Color="#FF15151C" />
+        <SolidColorBrush x:Key="Brush.Border" Color="#FF34343F" />
+        <SolidColorBrush x:Key="Brush.BorderHi" Color="#FF4E4E60" />
+        <SolidColorBrush x:Key="Brush.TextDim" Color="#FF9A9AB0" />
+        <SolidColorBrush x:Key="Brush.Accent" Color="#FF3D8BFD" />
+        <SolidColorBrush x:Key="Brush.InputOn" Color="#FF35E08A" />
+        <SolidColorBrush x:Key="Brush.OutputOn" Color="#FFFFB020" />
+        <SolidColorBrush x:Key="Brush.Danger" Color="#FFFF5C5C" />
+
+        <!--  ========== 分组面板外框 ==========  -->
+        <Style x:Key="PanelBorder" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Brush.Panel}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+
+        <!--  ========== 面板标题 ==========  -->
+        <Style x:Key="PanelTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+
+        <Style x:Key="PanelSubTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+
+        <!--  ========== 地址标签（等宽） ==========  -->
+        <Style x:Key="AddrText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Width" Value="44" />
+        </Style>
+
+        <!--  ========== 输入指示灯 I0.x（可控制：单击置位 / 复位） ==========  -->
+        <Style x:Key="LedCheckBox" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="IsHitTestVisible" Value="True" />
+            <Setter Property="ToolTip" Value="单击切换该输入点的 ON / OFF 状态" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border
+                            x:Name="Bd"
+                            Padding="9,7"
+                            Background="#FF2A2A36"
+                            BorderBrush="{StaticResource Brush.Border}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse
+                                    x:Name="Led"
+                                    Width="15"
+                                    Height="15"
+                                    VerticalAlignment="Center"
+                                    Fill="#FF45455A"
+                                    Stroke="#FF101014"
+                                    StrokeThickness="1" />
+                                <ContentPresenter
+                                    Grid.Column="1"
+                                    Margin="9,0,0,0"
+                                    VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Led" Property="Fill" Value="{StaticResource Brush.InputOn}" />
+                                <Setter TargetName="Led" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect
+                                            BlurRadius="12"
+                                            Opacity="0.95"
+                                            ShadowDepth="0"
+                                            Color="#FF35E08A" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Bd" Property="Background" Value="#FF1E3A2C" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Brush.InputOn}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Brush.BorderHi}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF32323E" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  ========== 输出状态指示 Q0.x（只读：仅显示线圈是否激活，不接受任何手动操作） ==========  -->
+        <Style x:Key="OutCheckBox" TargetType="CheckBox">
+            <Setter Property="Margin" Value="4" />
+            <!--  只读三件套：不吃鼠标事件、不可聚焦、光标不变手  -->
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="ToolTip" Value="输出线圈状态为只读监视，由 PLC 回读刷新，界面不接受手动置位" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border
+                            x:Name="Bd"
+                            Padding="9,7"
+                            Background="#FF2A2A36"
+                            BorderBrush="{StaticResource Brush.Border}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter VerticalAlignment="Center" />
+                                <!--  只读状态指示灯 + 文字状态  -->
+                                <StackPanel
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                                    <TextBlock
+                                        x:Name="TxtState"
+                                        Margin="0,0,7,0"
+                                        VerticalAlignment="Center"
+                                        FontFamily="Consolas"
+                                        FontSize="11"
+                                        FontWeight="Bold"
+                                        Foreground="#FF6A6A7C"
+                                        Text="OFF" />
+                                    <Ellipse
+                                        x:Name="Led"
+                                        Width="15"
+                                        Height="15"
+                                        VerticalAlignment="Center"
+                                        Fill="#FF45455A"
+                                        Stroke="#FF101014"
+                                        StrokeThickness="1" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!--  线圈激活：橙色发光 + 边框高亮 + 文字变 ON  -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Led" Property="Fill" Value="{StaticResource Brush.OutputOn}" />
+                                <Setter TargetName="Led" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect
+                                            BlurRadius="12"
+                                            Opacity="0.95"
+                                            ShadowDepth="0"
+                                            Color="#FFFFB020" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="TxtState" Property="Text" Value="ON" />
+                                <Setter TargetName="TxtState" Property="Foreground" Value="{StaticResource Brush.OutputOn}" />
+                                <Setter TargetName="Bd" Property="Background" Value="#FF3A2E18" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Brush.OutputOn}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="{x:Null}">
+                                <Setter TargetName="TxtState" Property="Text" Value="--" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  ========== 输入框（IP / 端口） ==========  -->
+        <Style x:Key="FieldBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource Brush.PanelDeep}" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
+            <Setter Property="CaretBrush" Value="#FFFFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="14" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource Brush.BorderHi}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!--  ========== 占位提示文字 ==========  -->
+        <Style x:Key="Watermark" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF6A6A7C" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="10,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
+
+        <!--  ========== 主按钮 ==========  -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource Brush.Accent}" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="20,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="Bd"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF5C9DFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF2C6FD6" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  ========== 断开连接按钮 ==========  -->
+        <Style x:Key="DisconnectionButton" TargetType="Button">
+            <Setter Property="Background" Value="red" />
+            <Setter Property="Foreground" Value="#FFFFFFFF" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="20,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="Bd"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--  ========== 次要按钮 ==========  -->
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="Bd"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Brush.BorderHi}" />
+                                <Setter Property="Foreground" Value="#FFE8E8F0" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF2E2E3A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <!--  ==================== 主布局 ====================  -->
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <!--  标题  -->
+            <RowDefinition Height="Auto" />
+            <!--  连接区  -->
+            <RowDefinition Height="*" />
+            <!--  I/O 区  -->
+            <RowDefinition Height="200" />
+            <!--  日志区  -->
+        </Grid.RowDefinitions>
+
+        <!--  ========== 顶部标题 ==========  -->
+        <Grid Grid.Row="0" Margin="2,0,2,12">
+            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                <Border
+                    Width="4"
+                    Height="20"
+                    Margin="0,0,9,0"
+                    Background="{StaticResource Brush.Accent}"
+                    CornerRadius="2" />
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="Bold"
+                    Foreground="#FFFFFFFF"
+                    Text="PLC 数字量 I/O 监控面板" />
+                <TextBlock
+                    Margin="10,0,0,2"
+                    VerticalAlignment="Bottom"
+                    FontSize="12"
+                    Foreground="{StaticResource Brush.TextDim}"
+                    Text="DI 8 点  /  DQ 8 点" />
+            </StackPanel>
+            <StackPanel
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+                <Ellipse
+                    x:Name="LedConn"
+                    Width="10"
+                    Height="10"
+                    VerticalAlignment="Center"
+                    Fill="{StaticResource Brush.Danger}" />
+                <TextBlock
+                    x:Name="TxtConnState"
+                    Margin="7,0,0,0"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource Brush.TextDim}"
+                    Text="未连接" />
+            </StackPanel>
+        </Grid>
+
+        <!--  ========== 连接参数区 ==========  -->
+        <Border
+            Grid.Row="1"
+            Margin="0,0,0,12"
+            Style="{StaticResource PanelBorder}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="260" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--  IP 地址  -->
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,10,0"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource Brush.TextDim}"
+                    Text="IP 地址" />
+                <Grid Grid.Column="1">
+                    <TextBox
+                        x:Name="TxtIp"
+                        MaxLength="15"
+                        Style="{StaticResource FieldBox}"
+                        Text="192.168.0.2"
+                        ToolTip="IPv4 地址，例如 192.168.0.1" />
+                    <TextBlock Text="例如 192.168.0.1">
+                        <TextBlock.Style>
+                            <Style BasedOn="{StaticResource Watermark}" TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=TxtIp}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <!--  端口  -->
+                <TextBlock
+                    Grid.Column="2"
+                    Margin="18,0,10,0"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource Brush.TextDim}"
+                    Text="端口" />
+                <Grid Grid.Column="3">
+                    <TextBox
+                        x:Name="TxtPort"
+                        MaxLength="5"
+                        Style="{StaticResource FieldBox}"
+                        Text="102"
+                        ToolTip="通信端口，例如西门子 S7 默认 102、Modbus TCP 默认 502" />
+                </Grid>
+
+                <!--  机架 / 槽号  -->
+                <TextBlock
+                    Grid.Column="4"
+                    Margin="18,0,10,0"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource Brush.TextDim}"
+                    Text="机架 / 槽号" />
+                <StackPanel Grid.Column="5" Orientation="Horizontal">
+                    <TextBox
+                        x:Name="TxtRack"
+                        Width="46"
+                        MaxLength="2"
+                        Style="{StaticResource FieldBox}"
+                        Text="0"
+                        ToolTip="Rack" />
+                    <TextBox
+                        x:Name="TxtSlot"
+                        Width="46"
+                        Margin="8,0,0,0"
+                        MaxLength="2"
+                        Style="{StaticResource FieldBox}"
+                        Text="1"
+                        ToolTip="Slot" />
+                </StackPanel>
+
+                <!--  操作按钮  -->
+                <StackPanel Grid.Column="7" Orientation="Horizontal">
+                    <Button
+                        x:Name="BtnTest"
+                        Margin="0,0,8,0"
+                        Content="测试连通"
+                        Style="{StaticResource GhostButton}" />
+                    <Button
+                        x:Name="BtnConnect"
+                        Margin="0,0,8,0"
+                        Click="ConnectPLC_Click"
+                        Content="连  接"
+                        Style="{StaticResource PrimaryButton}" />
+                    <Button
+                        x:Name="BtnDisConnection"
+                        Margin="0,0,8,0"
+                        Click="DisconnectPLC_Click"
+                        Content="断开连接"
+                        Style="{StaticResource DisconnectionButton}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--  ========== I / O 区 ==========  -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!--  ===== 数字量输入 DI =====  -->
+            <Border Grid.Column="0" Style="{StaticResource PanelBorder}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="0"
+                            Style="{StaticResource PanelTitle}"
+                            Text="数字量输入  DI" />
+                        <Border
+                            Margin="10,0,0,0"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Background="#FF1E3A2C"
+                            CornerRadius="4">
+                            <TextBlock
+                                FontFamily="Consolas"
+                                FontSize="11"
+                                Foreground="{StaticResource Brush.InputOn}"
+                                Text="I0.0 - I0.7" />
+                        </Border>
+                        <Border
+                            Margin="6,0,0,0"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Background="#FF1F3350"
+                            CornerRadius="4">
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{StaticResource Brush.Accent}"
+                                Text="可控制" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock
+                        Grid.Row="1"
+                        Style="{StaticResource PanelSubTitle}"
+                        Text="可控制：单击强制置位（ON）/ 复位（OFF），用于下发输入信号" />
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <UniformGrid Columns="2" Rows="4">
+
+                            <CheckBox x:Name="ChkI0" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.0" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="启动按钮" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI1" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.1" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="停止按钮" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI2" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.2" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="急停信号" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI3" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.3" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="原位到位" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI4" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.4" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="上限位" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI5" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.5" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="下限位" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI6" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.6" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="光电检测" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkI7" Style="{StaticResource LedCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="I0.7" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="备用输入" />
+                                </StackPanel>
+                            </CheckBox>
+
+                        </UniformGrid>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!--  ===== 数字量输出 DQ =====  -->
+            <Border Grid.Column="2" Style="{StaticResource PanelBorder}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <TextBlock
+                            Margin="0"
+                            Style="{StaticResource PanelTitle}"
+                            Text="数字量输出  DQ" />
+                        <Border
+                            Margin="10,0,0,0"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Background="#FF3A2E18"
+                            CornerRadius="4">
+                            <TextBlock
+                                FontFamily="Consolas"
+                                FontSize="11"
+                                Foreground="{StaticResource Brush.OutputOn}"
+                                Text="Q0.0 - Q0.7" />
+                        </Border>
+                        <Border
+                            Margin="6,0,0,0"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Background="#FF2A2A36"
+                            CornerRadius="4">
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{StaticResource Brush.TextDim}"
+                                Text="只读监视" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock
+                        Grid.Row="1"
+                        Style="{StaticResource PanelSubTitle}"
+                        Text="只读监视：线圈是否激活由 PLC 回读刷新，界面不接受手动操作" />
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <UniformGrid Columns="2" Rows="4">
+
+                            <CheckBox x:Name="ChkQ0" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.0" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="主电机" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ1" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.1" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="电磁阀 A" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ2" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.2" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="电磁阀 B" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ3" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.3" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="运行指示" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ4" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.4" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="报警指示" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ5" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.5" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="蜂鸣器" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ6" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.6" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="冷却风扇" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <CheckBox x:Name="ChkQ7" Style="{StaticResource OutCheckBox}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource AddrText}" Text="Q0.7" />
+                                    <TextBlock Foreground="{StaticResource Brush.TextDim}" Text="备用输出" />
+                                </StackPanel>
+                            </CheckBox>
+
+                        </UniformGrid>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!--  ========== 日志记录区 ==========  -->
+        <Border
+            Grid.Row="3"
+            Margin="0,12,0,0"
+            Style="{StaticResource PanelBorder}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!--  日志工具条  -->
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock
+                            Margin="0"
+                            Style="{StaticResource PanelTitle}"
+                            Text="日志记录" />
+                        <Border
+                            Margin="10,0,0,0"
+                            Padding="6,2"
+                            VerticalAlignment="Center"
+                            Background="#FF2A2A36"
+                            CornerRadius="4">
+                            <TextBlock
+                                x:Name="TxtLogCount"
+                                FontSize="11"
+                                Foreground="{StaticResource Brush.TextDim}" />
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <Button
+                            x:Name="BtnCopyLog"
+                            Margin="0,0,8,0"
+                            Content="复制"
+                            Style="{StaticResource GhostButton}" />
+                        <Button
+                            x:Name="BtnSaveLog"
+                            Margin="0,0,8,0"
+                            Content="导出"
+                            Style="{StaticResource GhostButton}" />
+                        <Button
+                            x:Name="BtnClearLog"
+                            Content="清空"
+                            Style="{StaticResource GhostButton}" />
+                    </StackPanel>
+                </Grid>
+
+                <!--  日志正文  -->
+                <Border
+                    Grid.Row="1"
+                    Background="{StaticResource Brush.PanelDeep}"
+                    BorderBrush="{StaticResource Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="5">
+                    <TextBox
+                        x:Name="TxtLog"
+                        Padding="10,8"
+                        VerticalContentAlignment="Top"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CaretBrush="#FFC8C8D8"
+                        FontFamily="Consolas"
+                        FontSize="12.5"
+                        Foreground="#FFC8C8D8"
+                        HorizontalScrollBarVisibility="Disabled"
+                        IsReadOnly="True"
+                        IsReadOnlyCaretVisible="False"
+                        TextWrapping="Wrap"
+                        VerticalScrollBarVisibility="Auto" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
