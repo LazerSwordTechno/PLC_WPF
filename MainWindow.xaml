@@ -1,9 +1,4 @@
-﻿<!--
-    PLC I/O 监控面板（纯 XAML，无后端 / 无 ViewModel / 无数据绑定层）
-    代码后置只需标准构造函数：InitializeComponent();
-    x:Class 请按你自己的项目命名空间调整。
--->
-<Window
+﻿<Window
     x:Class="PlcIoPanel.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
