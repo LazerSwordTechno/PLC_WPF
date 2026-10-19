@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="../MVVMDemo/MVVMDemo.csproj" Id="dd76e34c-ed92-496d-a08a-322558064dd5" />
   <Project Path="PLC_WPF.csproj" />
 </Solution>
