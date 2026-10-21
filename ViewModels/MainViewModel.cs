@@ -42,7 +42,15 @@ public partial class MainViewModel : ObservableObject
                 CpuType.S7200Smart, IpAddress, (short)Rack, (short)Slot);
 
             if (ok)
+            {
                 AppendLog($"{IpAddress} 连接成功");
+
+                var Inputstate = await _ioService.ReadInputStateAsync();
+                var Outputstate = await _ioService.ReadOutputStateAsync();
+                // Do something with the states
+                AppendLog($"当前 Input 状态：{Convert.ToString(Inputstate, 2).PadLeft(8, '0')}");
+                AppendLog($"当前 Output 状态：{Convert.ToString(Outputstate, 2).PadLeft(8, '0')}");
+            }
             else
                 AppendLog("连接失败");
         }
@@ -70,5 +78,18 @@ public partial class MainViewModel : ObservableObject
                && addr.AddressFamily == AddressFamily.InterNetwork
                && Rack >= 0 && Rack <= 255
                && Slot >= 0 && Slot <= 255;
+    }
+
+    private async void ChangeI0State()
+    {
+        try
+        {
+            var Inputstate = await _ioService.ReadInputStateAsync();
+            AppendLog($"当前 Input 状态：{Convert.ToString(Inputstate, 2).PadLeft(8, '0')}");
+        }
+        catch (Exception e)
+        {
+            AppendLog($"读取 I0 状态异常：{e.Message}");
+        }
     }
 }
